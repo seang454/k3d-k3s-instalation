@@ -251,33 +251,91 @@ You will receive the HTML response: **"Welcome to nginx!"**.
 
 ---
 
-### 🌐 Complete Network Traffic Flow Diagram
+### 🌐 Complete Network Traffic Flow & Port Mapping Architecture
 
-Here is what happens under the hood when you open `http://localhost:8080`:
+#### 1. Why Port `8080` for Ingress?
+
+Port `8080` is **not fixed or mandatory**. It was chosen because of how the `-p` flag was defined during cluster creation:
+
+```text
+k3d cluster create mycluster ... -p "8080:80@loadbalancer"
+```
+
+Look at what each part of that flag represents:
 
 ```
-1. Browser requests: http://localhost:8080
-         │
-         ▼
-2. Windows Host forwards port 8080 to Docker container
-         │
-         ▼
-3. [Container: k3d-mycluster-serverlb] (Port 80)
-   (Reverse proxy receives request and forwards into cluster network)
-         │
-         ▼
-4. [Traefik Ingress Controller] (inside k3s)
-   (Reads the ingress rule: path "/" -> forward to Service "nginx-demo")
-         │
-         ▼
-5. [Kubernetes Service: nginx-demo]
-   (Round-robin load balances between healthy pod endpoints)
-         │
-         ├───────────────────────────────┐
-         ▼                               ▼
-6. [Pod: nginx-demo-xxx]        [Pod: nginx-demo-yyy]
-   (Running on agent-0)           (Running on agent-1)
+        8080        :         80           @loadbalancer
+         ▲                    ▲                  ▲
+         │                    │                  │
+    Your Windows         Inside Cluster       The Target
+     (localhost)       (Traefik Ingress)      (k3d Proxy)
 ```
+
+1. **Inside the cluster (`:80`)**:
+   * Traefik (the built-in Ingress controller) always listens on standard HTTP port **`80`** inside the container.
+2. **On your Windows laptop (`8080:`)**:
+   * Standard port `80` on Windows is often taken by Windows services (e.g., IIS, World Wide Web Publishing Service, or developer tools). Using `8080` avoids port conflicts on Windows.
+3. **`@loadbalancer`**:
+   * Tells `k3d` to map port `8080` to the cluster's **Load Balancer container (`k3d-mycluster-serverlb`)**, which forwards directly into Traefik.
+
+---
+
+#### 2. Visual Architecture Diagram: From Windows Host to Pod
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ WINDOWS HOST                                                                           │
+│                                                                                        │
+│   Web Browser: http://localhost:8080                                                   │
+│        │                                                                               │
+└────────┼───────────────────────────────────────────────────────────────────────────────┘
+         │ Port Forwarding (8080 ──► 80)
+         ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ DOCKER CONTAINER: k3d-mycluster-serverlb (Load Balancer / Ingress Proxy)               │
+│                                                                                        │
+│   • Listens on Port 80                                                                 │
+│   • Forwards traffic into the Kubernetes cluster network via k3d bridge                │
+└────────┬───────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ KUBERNETES CLUSTER (k3s)                                                               │
+│                                                                                        │
+│   ┌────────────────────────────────────────────────────────────────────────────────┐   │
+│   │ Pod: traefik (Ingress Controller in kube-system)                                │   │
+│   │ • Inspects incoming HTTP path (e.g. "/")                                       │   │
+│   │ • Reads Ingress rule ──► targets Service "my-nginx:80"                         │   │
+│   └──────────────────────────────────────┬─────────────────────────────────────────┘   │
+│                                          │                                             │
+│                                          ▼                                             │
+│   ┌────────────────────────────────────────────────────────────────────────────────┐   │
+│   │ Service: my-nginx (ClusterIP: 10.43.21.219:80)                                 │   │
+│   │ • Acts as stable virtual IP and load-balancer across pod endpoints             │   │
+│   └──────────────────────┬───────────────────────────────────┬─────────────────────┘   │
+│                          │                                   │                         │
+│                          ▼                                   ▼                         │
+│   ┌───────────────────────────────┐   ┌───────────────────────────────┐                │
+│   │ Pod: nginx-xxx (Worker 1)     │   │ Pod: nginx-yyy (Worker 2)     │                │
+│   │ • IP: 10.42.1.x:80            │   │ • IP: 10.42.2.x:80            │                │
+│   │ • Returns: "Welcome to nginx!"│   │ • Returns: "Welcome to nginx!"│                │
+│   └───────────────────────────────┘   └───────────────────────────────┘                │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 3. Customizing Your Ingress Ports
+
+You have complete freedom to choose any port when creating clusters:
+
+| Desired Access URL | Flag to Use | When to Use |
+| :--- | :--- | :--- |
+| **`http://localhost`** *(clean, no port)* | `-p "80:80@loadbalancer"` | If port 80 is free on your Windows machine |
+| **`http://localhost:8080`** *(standard dev)* | `-p "8080:80@loadbalancer"` | Avoids Windows IIS port 80 conflicts |
+| **`http://localhost:3000`** *(custom dev)* | `-p "3000:80@loadbalancer"` | If you prefer port 3000 |
+| **`https://localhost:8443`** *(HTTPS/SSL)* | `-p "8443:443@loadbalancer"` | For secure SSL/TLS Ingress testing |
+| **Multi-cluster (Cluster 2)** | `-p "8081:80@loadbalancer"` | Running multiple clusters side-by-side |
 
 ---
 
