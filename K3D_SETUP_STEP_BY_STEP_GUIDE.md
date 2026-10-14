@@ -7,14 +7,16 @@ This guide walks you through setting up a multi-node Kubernetes cluster using **
 ## 🧭 Table of Contents
 1. [Why Are We Doing It This Way? (The Big Picture)](#1-why-are-we-doing-it-this-way-the-big-picture)
 2. [Step 1: Install kubectl CLI](#step-1-install-kubectl-cli)
-3. [Step 2: Install k3d CLI](#step-2-install-k3d-cli)
-4. [Step 3: Verify Prerequisites](#step-3-verify-prerequisites)
-5. [Step 4: Create Your Multi-Node Cluster](#step-4-create-your-multi-node-cluster)
-6. [Step 5: Verify the Cluster and Inspect Containers](#step-5-verify-the-cluster-and-inspect-containers)
-7. [Step 6: Deploy a Test Application (Full Flow)](#step-6-deploy-a-test-application-full-flow)
-8. [Step 7: Cluster Lifecycle & Resource Management](#step-7-cluster-lifecycle--resource-management)
-9. [Step 8: Real-World Troubleshooting & Deep-Dive Explanations](#step-8-real-world-troubleshooting--deep-dive-explanations-windows-specific)
-10. [Summary: Key Takeaways](#summary-key-takeaways)
+3. [Step 2: Install Helm CLI](#step-2-install-helm-cli)
+4. [Step 3: Install k3d CLI](#step-3-install-k3d-cli)
+5. [Step 4: Verify Prerequisites](#step-4-verify-prerequisites)
+6. [Step 5: Create Your Multi-Node Cluster](#step-5-create-your-multi-node-cluster)
+7. [Step 6: Verify the Cluster and Inspect Containers](#step-6-verify-the-cluster-and-inspect-containers)
+8. [Step 7: Deploy a Test Application (Full Flow)](#step-7-deploy-a-test-application-full-flow)
+9. [Step 8: Deploy Applications Using Helm Charts](#step-8-deploy-applications-using-helm-charts)
+10. [Step 9: Cluster Lifecycle & Resource Management](#step-9-cluster-lifecycle--resource-management)
+11. [Step 10: Real-World Troubleshooting & Deep-Dive Explanations](#step-10-real-world-troubleshooting--deep-dive-explanations-windows-specific)
+12. [Summary: Key Takeaways](#summary-key-takeaways)
 
 ---
 
@@ -59,7 +61,31 @@ sudo mv ./kubectl /usr/local/bin/kubectl
 
 ---
 
-## Step 2: Install k3d CLI
+## Step 2: Install Helm CLI
+
+Helm is the **package manager for Kubernetes** (think `npm` for Node.js, `pip` for Python, or `apt` for Ubuntu).
+
+> [!NOTE]
+> `k3d` creates the cluster, but it does **not** install client tools like `helm` onto your Windows host. You must install the `helm` CLI tool on your operating system so it can deploy charts to your k3d cluster.
+
+### Option A: On Windows (PowerShell via Winget) ⭐
+```powershell
+winget install Helm.Helm
+```
+*(Or via Chocolatey / Scoop if you use them: `choco install kubernetes-helm` or `scoop install helm`)*
+
+### Option B: On Linux / WSL / Git Bash
+```bash
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+### 💡 Why do we need `helm`?
+* Instead of writing 10 separate YAML files for a single application (Deployment, Service, ConfigMap, Secret, Ingress, RBAC), a **Helm chart** packages them all into a single, reusable, configurable bundle.
+* With one command (`helm install my-db bitnami/postgresql`), you get a production-ready database with replication and security configured automatically.
+
+---
+
+## Step 3: Install k3d CLI
 
 ### Option A: Via Official Bash Script (Linux, WSL, or Git Bash) ⭐
 If you are using **WSL2 (Ubuntu/Debian)** or **Git Bash**, run the official install script:
@@ -255,7 +281,41 @@ Here is what happens under the hood when you open `http://localhost:8080`:
 
 ---
 
-## Step 7: Cluster Lifecycle & Resource Management
+## Step 8: Deploy Applications Using Helm Charts
+
+Now that you have `helm` installed on your machine and a running `k3d` cluster, you can install any Kubernetes Helm chart.
+
+### 1. Add a Helm Chart Repository
+Helm charts are hosted in repositories (like package registries). Add the popular Bitnami repository:
+```powershell
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+```
+
+### 2. Install a Chart (Example: NGINX Web Server)
+```powershell
+helm install my-web bitnami/nginx
+```
+
+### 3. Check Installed Helm Releases & Resources
+```powershell
+# List your Helm releases:
+helm list
+
+# View the pods and services created by Helm:
+kubectl get pods
+kubectl get svc
+```
+
+### 4. Delete / Uninstall a Helm Release
+When you are done testing:
+```powershell
+helm uninstall my-web
+```
+
+---
+
+## Step 9: Cluster Lifecycle & Resource Management
 
 Since you are running this on a laptop, you don't want Kubernetes consuming battery and CPU when you are not actively using it.
 
@@ -268,7 +328,7 @@ Since you are running this on a laptop, you don't want Kubernetes consuming batt
 
 ---
 
-## Step 8: 🚨 Real-World Troubleshooting & Deep-Dive Explanations (Windows Specific)
+## Step 10: 🚨 Real-World Troubleshooting & Deep-Dive Explanations (Windows Specific)
 
 During setup on Windows with Docker Desktop, you may encounter two specific issues. Here is the deep technical explanation of **what happens, why it happens, and how to permanently prevent it**:
 
