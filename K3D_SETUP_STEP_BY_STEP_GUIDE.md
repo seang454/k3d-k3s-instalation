@@ -6,13 +6,15 @@ This guide walks you through setting up a multi-node Kubernetes cluster using **
 
 ## 🧭 Table of Contents
 1. [Why Are We Doing It This Way? (The Big Picture)](#1-why-are-we-doing-it-this-way-the-big-picture)
-2. [Step 1: Install k3d CLI](#step-1-install-k3d-cli)
-3. [Step 2: Verify Prerequisites](#step-2-verify-prerequisites)
-4. [Step 3: Create Your Multi-Node Cluster](#step-3-create-your-multi-node-cluster)
-5. [Step 4: Verify the Cluster and Inspect Containers](#step-4-verify-the-cluster-and-inspect-containers)
-6. [Step 5: Deploy a Test Application (Full Flow)](#step-5-deploy-a-test-application-full-flow)
-7. [Step 6: Cluster Lifecycle & Resource Management](#step-6-cluster-lifecycle--resource-management)
-8. [Summary: Troubleshooting & Key Takeaways](#summary-troubleshooting--key-takeaways)
+2. [Step 1: Install kubectl CLI](#step-1-install-kubectl-cli)
+3. [Step 2: Install k3d CLI](#step-2-install-k3d-cli)
+4. [Step 3: Verify Prerequisites](#step-3-verify-prerequisites)
+5. [Step 4: Create Your Multi-Node Cluster](#step-4-create-your-multi-node-cluster)
+6. [Step 5: Verify the Cluster and Inspect Containers](#step-5-verify-the-cluster-and-inspect-containers)
+7. [Step 6: Deploy a Test Application (Full Flow)](#step-6-deploy-a-test-application-full-flow)
+8. [Step 7: Cluster Lifecycle & Resource Management](#step-7-cluster-lifecycle--resource-management)
+9. [Step 8: Real-World Troubleshooting & Deep-Dive Explanations](#step-8-real-world-troubleshooting--deep-dive-explanations-windows-specific)
+10. [Summary: Key Takeaways](#summary-key-takeaways)
 
 ---
 
@@ -30,7 +32,34 @@ This guide walks you through setting up a multi-node Kubernetes cluster using **
 
 ---
 
-## Step 1: Install k3d CLI
+## Step 1: Install kubectl CLI
+
+Before you can interact with Kubernetes, you need `kubectl` (the official Kubernetes command-line tool).
+
+### Option A: On Windows (PowerShell via Winget or Curl)
+```powershell
+# Using winget (Recommended on Windows):
+winget install Kubernetes.kubectl
+
+# Or download direct binary:
+curl.exe -LO "https://dl.k8s.io/release/v1.31.4/bin/windows/amd64/kubectl.exe"
+```
+
+### Option B: On Linux / WSL / Git Bash
+```bash
+curl -LO "https://dl.k8s.io/release/v1.31.4/bin/linux/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+```
+
+### 💡 Why do we need `kubectl`?
+* `kubectl` is the steering wheel of Kubernetes.
+* It parses your commands (like `kubectl get nodes`, `kubectl create deployment`), formats them into HTTPS REST requests, and sends them to the Master Node's `kube-apiserver`.
+* Without `kubectl`, your cluster would be running, but you would have no way to view, control, or deploy apps to it!
+
+---
+
+## Step 2: Install k3d CLI
 
 ### Option A: Via Official Bash Script (Linux, WSL, or Git Bash) ⭐
 If you are using **WSL2 (Ubuntu/Debian)** or **Git Bash**, run the official install script:
@@ -65,18 +94,18 @@ winget install k3d.k3d
 
 ---
 
-## Step 2: Verify Prerequisites
+## Step 3: Verify Prerequisites
 
 ### The Commands:
 ```powershell
 # 1. Verify Docker Engine is active
 docker ps
 
-# 2. Verify k3d CLI is installed
-k3d version
-
-# 3. Verify kubectl CLI is installed
+# 2. Verify kubectl CLI is installed
 kubectl version --client
+
+# 3. Verify k3d CLI is installed
+k3d version
 ```
 
 ### 💡 Why do we need this?
@@ -85,7 +114,7 @@ kubectl version --client
 
 ---
 
-## Step 3: Create Your Multi-Node Cluster
+## Step 4: Create Your Multi-Node Cluster
 
 ### The Command:
 ```powershell
@@ -133,7 +162,7 @@ k3d cluster create mycluster `
 
 ---
 
-## Step 4: Verify the Cluster and Inspect Containers
+## Step 5: Verify the Cluster and Inspect Containers
 
 ### The Commands:
 ```powershell
@@ -159,7 +188,7 @@ k3d-mycluster-agent-1     Up 1 minute
 
 ---
 
-## Step 5: Deploy a Test Application (Full Flow)
+## Step 6: Deploy a Test Application (Full Flow)
 
 Now we prove the cluster works by deploying a web server and accessing it from Windows.
 
@@ -226,7 +255,7 @@ Here is what happens under the hood when you open `http://localhost:8080`:
 
 ---
 
-## Step 6: Cluster Lifecycle & Resource Management
+## Step 7: Cluster Lifecycle & Resource Management
 
 Since you are running this on a laptop, you don't want Kubernetes consuming battery and CPU when you are not actively using it.
 
@@ -239,9 +268,7 @@ Since you are running this on a laptop, you don't want Kubernetes consuming batt
 
 ---
 
----
-
-## Step 7: 🚨 Real-World Troubleshooting & Deep-Dive Explanations (Windows Specific)
+## Step 8: 🚨 Real-World Troubleshooting & Deep-Dive Explanations (Windows Specific)
 
 During setup on Windows with Docker Desktop, you may encounter two specific issues. Here is the deep technical explanation of **what happens, why it happens, and how to permanently prevent it**:
 
