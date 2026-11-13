@@ -1,0 +1,275 @@
+# ==============================================================================
+# 5 Lightweight Microservices Behind ONE Single Port (localhost:8080)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# APP 1: NGINX Alpine Web Server (Path: /nginx)
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-nginx
+  labels:
+    app: app1-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1-nginx
+  template:
+    metadata:
+      labels:
+        app: app1-nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-nginx-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: app1-nginx
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# ------------------------------------------------------------------------------
+# APP 2: Echo Server / HTTP Inspector (Path: /echo)
+# Returns JSON with request headers, client IP, and HTTP details
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2-echo
+  labels:
+    app: app2-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app2-echo
+  template:
+    metadata:
+      labels:
+        app: app2-echo
+    spec:
+      containers:
+      - name: echo
+        image: ealen/echo-server:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-echo-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: app2-echo
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# ------------------------------------------------------------------------------
+# APP 3: WhoAmI Container Info Server (Path: /whoami)
+# Ultra-lightweight (~5MB) Go server showing container ID, host, and OS info
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3-whoami
+  labels:
+    app: app3-whoami
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app3-whoami
+  template:
+    metadata:
+      labels:
+        app: app3-whoami
+    spec:
+      containers:
+      - name: whoami
+        image: traefik/whoami:v1.10.1
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app3-whoami-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: app3-whoami
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# ------------------------------------------------------------------------------
+# APP 4: Apache HTTPD Web Server (Path: /httpd)
+# Returns standard "It works!" page
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app4-httpd
+  labels:
+    app: app4-httpd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app4-httpd
+  template:
+    metadata:
+      labels:
+        app: app4-httpd
+    spec:
+      containers:
+      - name: httpd
+        image: httpd:alpine
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app4-httpd-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: app4-httpd
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# ------------------------------------------------------------------------------
+# APP 5: HashiCorp HTTP-Echo (Path: /hello)
+# Ultra-minimal Go app (~3MB) returning a custom text response
+# ------------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app5-hello
+  labels:
+    app: app5-hello
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app5-hello
+  template:
+    metadata:
+      labels:
+        app: app5-hello
+    spec:
+      containers:
+      - name: hello
+        image: hashicorp/http-echo:0.2.3
+        args:
+        - "-text=🚀 Hello from HashiCorp http-echo running on k3d Kubernetes!"
+        ports:
+        - containerPort: 5678
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app5-hello-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: app5-hello
+  ports:
+  - port: 80
+    targetPort: 5678
+
+---
+# ==============================================================================
+# TRAEFIK MIDDLEWARE: Strip Path Prefix
+# When user accesses http://localhost:8080/httpd, Traefik strips "/httpd"
+# so Apache receives "/" and serves its default index.html page!
+# ==============================================================================
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-prefix-middleware
+spec:
+  stripPrefix:
+    prefixes:
+      - /httpd
+      - /nginx
+
+---
+# ==============================================================================
+# INGRESS: Routes ALL 5 Apps Through ONE Single Port (localhost:8080)
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: five-apps-ingress
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    # Apply the strip-prefix middleware:
+    traefik.ingress.kubernetes.io/router.middlewares: default-strip-prefix-middleware@kubernetescrd
+spec:
+  rules:
+  - http:
+      paths:
+      # App 1 -> /nginx
+      - path: /nginx
+        pathType: Prefix
+        backend:
+          service:
+            name: app1-nginx-svc
+            port:
+              number: 80
+
+      # App 2 -> /echo
+      - path: /echo
+        pathType: Prefix
+        backend:
+          service:
+            name: app2-echo-svc
+            port:
+              number: 80
+
+      # App 3 -> /whoami
+      - path: /whoami
+        pathType: Prefix
+        backend:
+          service:
+            name: app3-whoami-svc
+            port:
+              number: 80
+
+      # App 4 -> /httpd
+      - path: /httpd
+        pathType: Prefix
+        backend:
+          service:
+            name: app4-httpd-svc
+            port:
+              number: 80
+
+      # App 5 -> /hello
+      - path: /hello
+        pathType: Prefix
+        backend:
+          service:
+            name: app5-hello-svc
+            port:
+              number: 80
